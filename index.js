@@ -2,7 +2,8 @@ const axios = require("axios");
 const cheerio = require("cheerio");
 const fs = require("fs");
 const http = require("http");
-
+axios.defaults.maxRedirects = 5;
+axios.defaults.followRedirect = true;
 // ─── CONFIG & STATE ────────────────────────────────────────────────────────
 
 const CONFIG_FILE = "config.json";
