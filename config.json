@@ -1,0 +1,23 @@
+{
+  "discord_webhooks": {
+    "smyths": "https://discord.com/api/webhooks/1501154406471700552/gyIQu6Ysj2uLkypXx5UYbNS90klNCIBtrSVqfM0xRcl05ddP0mLtz_EX3xNW19GWgScS",
+    "argos": "https://discord.com/api/webhooks/1501134684896231524/q0iY_lwjq3ZkE0bgixP0O6sGaGkhtT5sB4mSfk9-DOkSGVkIDhp43koYvnNXOQGuq1KX",
+    "very": "https://discord.com/api/webhooks/1501154095908786276/6LjoA2OAYQXYok19KCk6Y7GNtFxtIVX_ypXTbssj5WemTR5_bh6ayZaAW93__xKviGFc",
+    "game": "https://discord.com/api/webhooks/1501154602626711765/Xa7gbgDQJx31vLMXtTVzKorPldEqrzEr0kWMc5BgTx9qY7niUOejGdX-KYY_2-SX1MHe",
+    "pokemoncenter": "https://discord.com/api/webhooks/1501154746130632754/DEpcFagoulQzibV_V7dpf5NyRP3RN10DGyoDUM1RBcefJdXKqsuyIOUm6GchOZ0U8M1s"
+  },
+  "check_interval_seconds": 90,
+  "products": [
+    {
+      "name": "Example - Replace with your product",
+      "retailers": ["smyths", "argos", "very", "game", "pokemoncenter"],
+      "urls": {
+        "smyths": "PASTE_PRODUCT_URL_HERE",
+        "argos": "PASTE_PRODUCT_URL_HERE",
+        "very": "PASTE_PRODUCT_URL_HERE",
+        "game": "PASTE_PRODUCT_URL_HERE",
+        "pokemoncenter": "PASTE_PRODUCT_URL_HERE"
+      }
+    }
+  ]
+}
