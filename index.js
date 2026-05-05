@@ -10,7 +10,7 @@ axios.defaults.followRedirect = true;
 const CONFIG_FILE = "config.json";
 const STATE_FILE = "stock_state.json";
 const KEEPALIVE_PORT = 3000;
-const CHROME_PATH = "/usr/bin/google-chrome-stable";
+const CHROME_PATH = "/usr/bin/google-chrome";
 
 function loadConfig() {
   if (!fs.existsSync(CONFIG_FILE)) { console.error("❌ config.json not found."); process.exit(1); }
