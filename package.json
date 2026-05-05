@@ -1,0 +1,13 @@
+{
+  "name": "pokemon-stock-monitor",
+  "version": "1.0.0",
+  "description": "UK Pokemon TCG stock alert bot",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "cheerio": "^1.0.0"
+  }
+}
