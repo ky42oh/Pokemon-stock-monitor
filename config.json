@@ -9,15 +9,94 @@
   "check_interval_seconds": 90,
   "products": [
     {
-      "name": "Example - Replace with your product",
-      "retailers": ["smyths", "argos", "very", "game", "pokemoncenter"],
-      "urls": {
-        "smyths": "PASTE_PRODUCT_URL_HERE",
-        "argos": "PASTE_PRODUCT_URL_HERE",
-        "very": "PASTE_PRODUCT_URL_HERE",
-        "game": "PASTE_PRODUCT_URL_HERE",
-        "pokemoncenter": "PASTE_PRODUCT_URL_HERE"
-      }
+      "name": "Pokemon Product 7683255",
+      "retailers": ["argos"],
+      "urls": { "argos": "https://www.argos.co.uk/product/7683255" }
+    },
+    {
+      "name": "Pokemon Product 7732467",
+      "retailers": ["argos"],
+      "urls": { "argos": "https://www.argos.co.uk/product/7732467" }
+    },
+    {
+      "name": "Pokemon Product 7898923",
+      "retailers": ["argos"],
+      "urls": { "argos": "https://www.argos.co.uk/product/7898923" }
+    },
+    {
+      "name": "Pokemon Product 7898930",
+      "retailers": ["argos"],
+      "urls": { "argos": "https://www.argos.co.uk/product/7898930" }
+    },
+    {
+      "name": "Pokemon Product 7993127",
+      "retailers": ["argos"],
+      "urls": { "argos": "https://www.argos.co.uk/product/7993127" }
+    },
+    {
+      "name": "Pokemon Product 8028204",
+      "retailers": ["argos"],
+      "urls": { "argos": "https://www.argos.co.uk/product/8028204" }
+    },
+    {
+      "name": "Perfect Order Elite Trainer Box",
+      "retailers": ["argos"],
+      "urls": { "argos": "https://www.argos.co.uk/product/8028493" }
+    },
+    {
+      "name": "Pokemon Product 8185312",
+      "retailers": ["argos"],
+      "urls": { "argos": "https://www.argos.co.uk/product/8185312" }
+    },
+    {
+      "name": "Ascended Heroes Mega Emboar ex Box",
+      "retailers": ["argos"],
+      "urls": { "argos": "https://www.argos.co.uk/product/8185769" }
+    },
+    {
+      "name": "Pokemon Product 8512239",
+      "retailers": ["argos"],
+      "urls": { "argos": "https://www.argos.co.uk/product/8512239" }
+    },
+    {
+      "name": "Destined Rivals Booster Box",
+      "retailers": ["argos"],
+      "urls": { "argos": "https://www.argos.co.uk/product/8488909" }
+    },
+    {
+      "name": "Pokemon Product 8511113",
+      "retailers": ["argos"],
+      "urls": { "argos": "https://www.argos.co.uk/product/8511113" }
+    },
+    {
+      "name": "Ascended Heroes Elite Trainer Box",
+      "retailers": ["argos"],
+      "urls": { "argos": "https://www.argos.co.uk/product/8568874" }
+    },
+    {
+      "name": "Pokemon Product 3907980",
+      "retailers": ["argos"],
+      "urls": { "argos": "https://www.argos.co.uk/product/3907980" }
+    },
+    {
+      "name": "Phantasmal Flames Booster Box",
+      "retailers": ["argos"],
+      "urls": { "argos": "https://www.argos.co.uk/product/7796582" }
+    },
+    {
+      "name": "Mega Zygarde ex Premium Collection",
+      "retailers": ["argos"],
+      "urls": { "argos": "https://www.argos.co.uk/product/8394134" }
+    },
+    {
+      "name": "Pokemon Product 8668475",
+      "retailers": ["argos"],
+      "urls": { "argos": "https://www.argos.co.uk/product/8668475" }
+    },
+    {
+      "name": "Pokemon Product 2205542",
+      "retailers": ["argos"],
+      "urls": { "argos": "https://www.argos.co.uk/product/2205542" }
     }
   ]
 }
