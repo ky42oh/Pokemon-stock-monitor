@@ -5,7 +5,6 @@ const http = require("http");
 const puppeteer = require("puppeteer-core");
 
 axios.defaults.maxRedirects = 5;
-axios.defaults.followRedirect = true;
 
 const CONFIG_FILE = "config.json";
 const STATE_FILE = "stock_state.json";
@@ -21,57 +20,34 @@ function loadState() {
 }
 function saveState(state) { fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2)); }
 
-// ─── BROWSER ───────────────────────────────────────────────────────────────
-
 let browser = null;
 
 async function getBrowser() {
   if (!browser || !browser.isConnected()) {
     console.log("🌐 Launching headless Chrome...");
-    // Try multiple possible Chrome paths
-    const possiblePaths = [
-      "/usr/bin/google-chrome",
-      "/usr/bin/google-chrome-stable",
-      "/usr/bin/chromium",
-      "/usr/bin/chromium-browser",
-    ];
-    let executablePath = null;
-    for (const p of possiblePaths) {
-      if (fs.existsSync(p)) { executablePath = p; break; }
-    }
-    if (!executablePath) throw new Error("Chrome not found at any expected path");
+    const paths = ["/usr/bin/google-chrome","/usr/bin/google-chrome-stable","/usr/bin/chromium","/usr/bin/chromium-browser"];
+    const executablePath = paths.find(p => fs.existsSync(p));
+    if (!executablePath) throw new Error("Chrome not found");
     browser = await puppeteer.launch({
       executablePath,
       headless: "new",
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--no-first-run",
-        "--no-zygote",
-        "--single-process",
-        "--disable-extensions",
-      ],
+      args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage",
+             "--disable-gpu","--no-first-run","--no-zygote","--single-process"],
     });
-    console.log(`✅ Chrome launched from ${executablePath}`);
+    console.log("✅ Chrome launched");
   }
   return browser;
 }
 
-async function fetchPage(url, waitMs = 2500) {
+async function fetchPage(url, waitMs = 3000) {
   const b = await getBrowser();
   const page = await b.newPage();
   try {
     await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
-    await page.setExtraHTTPHeaders({
-      "Accept-Language": "en-GB,en;q=0.9",
-      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    });
-    // Block images/fonts to speed up loading
+    await page.setExtraHTTPHeaders({ "Accept-Language": "en-GB,en;q=0.9" });
     await page.setRequestInterception(true);
     page.on("request", req => {
-      if (["image", "font", "media"].includes(req.resourceType())) req.abort();
+      if (["image","font","media"].includes(req.resourceType())) req.abort();
       else req.continue();
     });
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 25000 });
@@ -81,8 +57,6 @@ async function fetchPage(url, waitMs = 2500) {
     await page.close();
   }
 }
-
-// ─── DISCORD ───────────────────────────────────────────────────────────────
 
 async function sendEmbed(webhookUrl, payload) {
   if (!webhookUrl || webhookUrl.startsWith("YOUR_")) return;
@@ -111,7 +85,8 @@ async function alertInStock(webhook, retailer, name, url, price) {
   });
 }
 
-async function alertNewCategoryListing(webhook, retailer, name, url) {
+async function alertNewListing(webhook, retailer, name, url, inStock, price) {
+  if (inStock) { await alertInStock(webhook, retailer, name, url, price); return; }
   await sendEmbed(webhook, {
     content: `🆕 **New product spotted on ${retailer.name}!**`,
     embeds: [buildEmbed({
@@ -120,32 +95,14 @@ async function alertNewCategoryListing(webhook, retailer, name, url) {
       url,
       fields: [
         { name: "🏪 Retailer", value: retailer.name, inline: true },
-        { name: "🔗 View Product", value: `[Click here](${url})`, inline: false },
-      ],
-      footer: "PokéMonitor UK • New product detected!"
-    })]
-  });
-}
-
-async function alertNewProductListing(webhook, retailer, name, url, inStock, price) {
-  if (inStock) { await alertInStock(webhook, retailer, name, url, price); return; }
-  await sendEmbed(webhook, {
-    content: null,
-    embeds: [buildEmbed({
-      color: 0x00b4d8,
-      title: `🆕 New listing spotted: ${name}`,
-      url,
-      fields: [
-        { name: "🏪 Retailer", value: retailer.name, inline: true },
-        { name: "📦 Status", value: "Not yet in stock — monitoring...", inline: true },
-        { name: "🔗 View", value: `[View product](${url})`, inline: false },
+        { name: "💰 Price", value: price || "Check site", inline: true },
+        { name: "📦 Status", value: "Out of stock — monitoring...", inline: false },
+        { name: "🔗 View", value: `[Click here](${url})`, inline: false },
       ],
       footer: "PokéMonitor UK • We'll @everyone when it's available"
     })]
   });
 }
-
-// ─── RETAILER CONFIG ───────────────────────────────────────────────────────
 
 const RETAILERS = {
   argos:         { name: "Argos",          emoji: "🛒", color: 0xe2001a },
@@ -155,13 +112,6 @@ const RETAILERS = {
   pokemoncenter: { name: "Pokémon Center", emoji: "🔴", color: 0xff0000 },
 };
 
-// Navigation/junk link names to filter out for GAME
-const GAME_JUNK = new Set([
-  "sign in", "my bag", "my wish list", "download on the apple store",
-  "download on the google play store", "wishlist", "basket", "account",
-  "help", "stores", "search", "home", "back", "menu"
-]);
-
 const CATEGORY_URLS = {
   argos:         "https://www.argos.co.uk/browse/toys/family-games/trading-cards-and-card-games/c:30425/brands:pokemon/",
   smyths:        "https://www.smythstoys.com/uk/en-gb/brand/pokemon/pokemon-trading-card-game/c/SM0601011202",
@@ -170,183 +120,210 @@ const CATEGORY_URLS = {
   pokemoncenter: "https://www.pokemoncenter.com/en-gb/category/trading-card-game",
 };
 
-// ─── CATEGORY SCRAPERS ─────────────────────────────────────────────────────
+const SEARCH_URLS = {
+  argos:         "https://www.argos.co.uk/search/pokemon+trading+card/",
+  smyths:        "https://www.smythstoys.com/uk/en-gb/search/?q=pokemon+trading+card",
+  very:          "https://www.very.co.uk/search?q=pokemon+trading+card",
+  game:          "https://www.game.co.uk/en/search?q=pokemon+card",
+  pokemoncenter: "https://www.pokemoncenter.com/en-gb/search?q=trading+card",
+};
 
-function scrapeArgos($) {
+const JUNK = new Set([
+  "sign in","my bag","my wish list","wishlist","basket","checkout",
+  "download on the apple store","download on the google play store",
+  "help","stores","search","account","login","register",
+  "cookie","privacy","terms","delivery","returns","contact","menu","home","back"
+]);
+
+function isJunk(name) {
+  if (!name || name.length < 5) return true;
+  return JUNK.has(name.toLowerCase().trim());
+}
+
+function isPokemon(name) {
+  const n = name.toLowerCase();
+  return n.includes("pok") || n.includes("tcg") || n.includes("trading card") ||
+         n.includes("booster") || n.includes("elite trainer") || n.includes("etb") ||
+         n.includes("mega evolution") || n.includes("scarlet") || n.includes("violet");
+}
+
+function extractProducts(retailerKey, $) {
   const products = [];
-  $("a[href*='/product/']").each((_, el) => {
-    const href = $(el).attr("href");
-    const match = href && href.match(/\/product\/(\d+)/);
-    if (match) {
+
+  if (retailerKey === "argos") {
+    $("a[href*='/product/']").each((_, el) => {
+      const href = $(el).attr("href");
+      const match = href && href.match(/\/product\/(\d+)/);
+      if (!match) return;
       const id = match[1];
-      const name = $(el).text().trim() || `Product ${id}`;
-      if (!products.find(p => p.id === id) && name.toLowerCase().includes("pok")) {
-        products.push({ id, name, url: `https://www.argos.co.uk/product/${id}` });
-      }
-    }
-  });
-  return products;
-}
-
-function scrapeSmyths($) {
-  const products = [];
-  $("a[href*='/p/']").each((_, el) => {
-    const href = $(el).attr("href");
-    if (!href || !href.includes("/uk/en-gb/")) return;
-    const match = href.match(/\/p\/(\d+)/);
-    if (!match) return;
-    const id = match[1];
-    const name = $(el).find("p, h3, [class*='name'], [class*='title']").first().text().trim()
-              || $(el).attr("title") || `Smyths Product ${id}`;
-    const url = `https://www.smythstoys.com${href.split("?")[0]}`;
-    if (!products.find(p => p.id === id)) products.push({ id, name, url });
-  });
-  return products;
-}
-
-function scrapeVery($) {
-  const products = [];
-  $("a[href]").each((_, el) => {
-    const href = $(el).attr("href");
-    if (!href) return;
-    // Very product URLs contain /p/ or end with a product code pattern
-    if (!href.includes("/p/") && !href.match(/\/[A-Z0-9]{6,}\/$/)) return;
-    const name = $(el).find("h3, [class*='title'], [class*='name']").first().text().trim()
-              || $(el).attr("title") || "";
-    if (!name || name.length < 5) return;
-    const id = href.split("/").filter(Boolean).pop().split("?")[0];
-    const url = href.startsWith("http") ? href : `https://www.very.co.uk${href}`;
-    if (id && !products.find(p => p.id === id)) products.push({ id, name, url });
-  });
-  return products;
-}
-
-function scrapeGame($) {
-  const products = [];
-  $("a[href]").each((_, el) => {
-    const href = $(el).attr("href");
-    if (!href) return;
-    const name = $(el).find("h3, [class*='name'], [class*='title'], p").first().text().trim()
-              || $(el).attr("title") || "";
-    if (!name || name.length < 5) return;
-    // Filter out navigation junk
-    if (GAME_JUNK.has(name.toLowerCase())) return;
-    if (!name.toLowerCase().includes("pok") && !name.toLowerCase().includes("card") && !name.toLowerCase().includes("tcg")) return;
-    const id = href.split("/").filter(Boolean).pop().split("?")[0];
-    const url = href.startsWith("http") ? href : `https://www.game.co.uk${href}`;
-    if (id && id.length > 3 && !products.find(p => p.id === id)) products.push({ id, name, url });
-  });
-  return products;
-}
-
-function scrapePokemonCenter($) {
-  const products = [];
-  $("a[href]").each((_, el) => {
-    const href = $(el).attr("href");
-    if (!href) return;
-    if (!href.includes("/product/") && !href.includes("/en-gb/")) return;
-    const name = $(el).find("h3, [class*='name'], [class*='title'], p").first().text().trim()
-              || $(el).attr("title") || "";
-    if (!name || name.length < 5) return;
-    const id = href.split("/").filter(Boolean).pop().split("?")[0];
-    const url = href.startsWith("http") ? href : `https://www.pokemoncenter.com${href}`;
-    if (id && !products.find(p => p.id === id)) products.push({ id, name, url });
-  });
-  return products;
-}
-
-const SCRAPERS = { argos: scrapeArgos, smyths: scrapeSmyths, very: scrapeVery, game: scrapeGame, pokemoncenter: scrapePokemonCenter };
-
-// ─── STOCK CHECKERS ────────────────────────────────────────────────────────
-
-async function checkStock(retailerKey, url) {
-  const html = await fetchPage(url, 2000);
-  const $ = cheerio.load(html);
-  let inStock = false, title = "", price = "";
-
-  switch (retailerKey) {
-    case "argos":
-      title = $("h1[data-test='product-title'], h1").first().text().trim();
-      price = $("[data-test='product-price']").first().text().trim();
-      inStock = $("button[data-test='add-to-trolley-button'], button[data-test='reserve-button']").length > 0
-             && $("[data-test='out-of-stock']").length === 0;
-      break;
-    case "smyths":
-      title = $("h1.pdp-title, h1.product-title, h1").first().text().trim();
-      price = $(".pdp-price, .product-price, [class*='price']").first().text().trim();
-      inStock = ($("button.add-to-cart-btn, button[data-interaction='add-to-cart'], .addToCartButton").length > 0
-             || $("button:contains('Add to Cart'), button:contains('Add to Basket')").length > 0)
-             && $(".out-of-stock, .js-out-of-stock, [class*='outOfStock']").length === 0;
-      break;
-    case "very":
-      title = $("h1.product-title, h1[itemprop='name'], h1").first().text().trim();
-      price = $(".product-price, [itemprop='price'], [class*='price']").first().text().trim();
-      inStock = $("button.add-to-basket, .addToBasket button, button:contains('Add to Basket')").length > 0
-             && $(".out-of-stock, [class*='outOfStock']").length === 0;
-      break;
-    case "game":
-      title = $("h1.product-name, h1.pdp-title, h1").first().text().trim();
-      price = $(".product-price, .price, [class*='price']").first().text().trim();
-      inStock = $("button.add-to-basket, button[data-action='add-to-basket'], button:contains('Add to Basket')").length > 0
-             && $(".out-of-stock, .not-available").length === 0;
-      break;
-    case "pokemoncenter":
-      title = $("h1.product-name, h1[class*='ProductName'], h1").first().text().trim();
-      price = $(".product-price, [class*='ProductPrice'], [class*='price']").first().text().trim();
-      inStock = $("button.add-to-cart, button[data-testid='add-to-cart'], button:contains('Add to Cart')").length > 0
-             && $(".out-of-stock, .sold-out, [class*='outOfStock']").length === 0;
-      break;
+      const parent = $(el).closest("[class*='product'],[class*='card'],li,article");
+      const name = parent.find("h2,h3,[class*='title'],[class*='name']").first().text().trim() || $(el).text().trim() || `Product ${id}`;
+      if (isJunk(name)) return;
+      const price = parent.find("[class*='price'],[data-test*='price']").first().text().trim();
+      const outOfStock = parent.find("[class*='out-of-stock'],[class*='unavailable'],[class*='OutOfStock']").length > 0;
+      const addBtn = parent.find("button[class*='add'],button[class*='trolley'],button[class*='basket']").length > 0;
+      const inStock = addBtn && !outOfStock;
+      const url = `https://www.argos.co.uk/product/${id}`;
+      if (!products.find(p => p.id === id)) products.push({ id, name, url, inStock, price });
+    });
   }
-  return { inStock, title, price };
+
+  else if (retailerKey === "smyths") {
+    $("a[href*='/p/']").each((_, el) => {
+      const href = $(el).attr("href");
+      if (!href || !href.includes("/uk/en-gb/")) return;
+      const match = href.match(/\/p\/(\d+)/);
+      if (!match) return;
+      const id = match[1];
+      const parent = $(el).closest("[class*='product'],[class*='card'],li,article");
+      const name = parent.find("p,h3,[class*='name'],[class*='title']").first().text().trim() || $(el).attr("title") || `Smyths ${id}`;
+      if (isJunk(name)) return;
+      const url = `https://www.smythstoys.com${href.split("?")[0]}`;
+      const price = parent.find("[class*='price']").first().text().trim();
+      const outOfStock = parent.find("[class*='out-of-stock'],[class*='unavailable']").length > 0;
+      const addBtn = parent.find("button[class*='add'],button[class*='cart']").length > 0;
+      const inStock = addBtn && !outOfStock;
+      if (!products.find(p => p.id === id)) products.push({ id, name, url, inStock, price });
+    });
+  }
+
+  else if (retailerKey === "very") {
+    $("a[href]").each((_, el) => {
+      const href = $(el).attr("href");
+      if (!href) return;
+      const parent = $(el).closest("[class*='product'],[class*='card'],li,article");
+      const name = parent.find("h3,[class*='title'],[class*='name']").first().text().trim() || $(el).attr("title") || "";
+      if (isJunk(name) || !isPokemon(name)) return;
+      const id = href.split("/").filter(Boolean).pop().split("?")[0];
+      const url = href.startsWith("http") ? href : `https://www.very.co.uk${href}`;
+      const price = parent.find("[class*='price']").first().text().trim();
+      const outOfStock = parent.find("[class*='out-of-stock'],[class*='unavailable']").length > 0;
+      const addBtn = parent.find("button[class*='add'],button[class*='basket']").length > 0;
+      const inStock = addBtn && !outOfStock;
+      if (id && !products.find(p => p.id === id)) products.push({ id, name, url, inStock, price });
+    });
+  }
+
+  else if (retailerKey === "game") {
+    $("a[href]").each((_, el) => {
+      const href = $(el).attr("href");
+      if (!href) return;
+      const parent = $(el).closest("[class*='product'],[class*='card'],li,article");
+      const name = parent.find("h3,[class*='name'],[class*='title']").first().text().trim() || $(el).attr("title") || "";
+      if (isJunk(name) || !isPokemon(name)) return;
+      const id = href.split("/").filter(Boolean).pop().split("?")[0];
+      if (!id || id.length < 3) return;
+      const url = href.startsWith("http") ? href : `https://www.game.co.uk${href}`;
+      const price = parent.find("[class*='price']").first().text().trim();
+      const outOfStock = parent.find("[class*='out-of-stock'],[class*='unavailable']").length > 0;
+      const addBtn = parent.find("button[class*='add'],button[class*='basket']").length > 0;
+      const inStock = addBtn && !outOfStock;
+      if (!products.find(p => p.id === id)) products.push({ id, name, url, inStock, price });
+    });
+  }
+
+  else if (retailerKey === "pokemoncenter") {
+    $("a[href]").each((_, el) => {
+      const href = $(el).attr("href");
+      if (!href || (!href.includes("/product/") && !href.includes("/en-gb/"))) return;
+      const parent = $(el).closest("[class*='product'],[class*='card'],li,article");
+      const name = parent.find("h3,[class*='name'],[class*='title']").first().text().trim() || $(el).attr("title") || "";
+      if (isJunk(name) || !isPokemon(name)) return;
+      const id = href.split("/").filter(Boolean).pop().split("?")[0];
+      const url = href.startsWith("http") ? href : `https://www.pokemoncenter.com${href}`;
+      const price = parent.find("[class*='price']").first().text().trim();
+      const outOfStock = parent.find("[class*='out-of-stock'],[class*='sold-out']").length > 0;
+      const addBtn = parent.find("button[class*='add'],button[class*='cart']").length > 0;
+      const inStock = addBtn && !outOfStock;
+      if (id && !products.find(p => p.id === id)) products.push({ id, name, url, inStock, price });
+    });
+  }
+
+  return products;
 }
 
-// ─── CATEGORY CHECK ────────────────────────────────────────────────────────
-
-async function checkCategory(retailerKey, config, state) {
+async function monitorPage(retailerKey, pageUrl, pageType, config, state) {
   const retailer = RETAILERS[retailerKey];
   const webhook = config.discord_webhooks?.[retailerKey];
-  const stateKey = `category::${retailerKey}`;
+  const listStateKey = `${pageType}::${retailerKey}`;
   try {
-    console.log(`  📋 Scanning ${retailer.name}...`);
-    const html = await fetchPage(CATEGORY_URLS[retailerKey], 3000);
+    console.log(`  📋 [${retailer.name}] ${pageType}...`);
+    const html = await fetchPage(pageUrl, 3000);
     const $ = cheerio.load(html);
-    const scraper = SCRAPERS[retailerKey];
-    const products = scraper($);
+    const products = extractProducts(retailerKey, $);
 
-    if (products.length === 0) {
-      console.log(`  ⚠️  [${retailer.name}] No products found`);
-      return;
-    }
-    console.log(`  ✅ [${retailer.name}] ${products.length} products found`);
+    if (products.length === 0) { console.log(`  ⚠️  [${retailer.name}] No products on ${pageType}`); return; }
+    console.log(`  ✅ [${retailer.name}] ${products.length} products on ${pageType}`);
 
-    const previousIds = new Set(state[stateKey] || []);
-    const newProducts = products.filter(p => !previousIds.has(p.id));
-    for (const product of newProducts) {
-      console.log(`  🆕 [${retailer.name}] New: ${product.name}`);
-      await alertNewCategoryListing(webhook, retailer, product.name, product.url);
-      await new Promise(r => setTimeout(r, 1000));
+    const previousIds = new Set(state[listStateKey] || []);
+
+    for (const product of products) {
+      const productStateKey = `product::${retailerKey}::${product.id}`;
+      const previousInStock = state[productStateKey];
+
+      if (!previousIds.has(product.id)) {
+        console.log(`  🆕 [${retailer.name}] New: ${product.name}${product.inStock ? " 🟢" : ""}`);
+        await alertNewListing(webhook, retailer, product.name, product.url, product.inStock, product.price);
+      } else if (product.inStock && previousInStock === false) {
+        console.log(`  🚨 [${retailer.name}] RESTOCK: ${product.name}`);
+        await alertInStock(webhook, retailer, product.name, product.url, product.price);
+      } else {
+        console.log(`  ${product.inStock ? "✅" : "❌"} [${retailer.name}] ${product.name}`);
+      }
+
+      state[productStateKey] = product.inStock;
+      await new Promise(r => setTimeout(r, 500));
     }
-    state[stateKey] = products.map(p => p.id);
+
+    state[listStateKey] = products.map(p => p.id);
   } catch (err) {
-    console.warn(`  ⚠️  [${retailer.name}] Category error: ${err.message}`);
+    console.warn(`  ⚠️  [${retailer.name}] ${pageType} error: ${err.message}`);
   }
 }
 
-// ─── PRODUCT CHECK ─────────────────────────────────────────────────────────
-
-async function checkProduct(product, retailerKey, config, state) {
+async function checkIndividualProduct(product, retailerKey, config, state) {
   const retailer = RETAILERS[retailerKey];
   if (!retailer) return;
-  const url = product.urls[retailerKey];
+  const url = product.urls?.[retailerKey];
   if (!url || url.includes("PASTE_PRODUCT_URL_HERE")) return;
-  const stateKey = `${retailerKey}::${url}`;
+  const stateKey = `individual::${retailerKey}::${url}`;
   const webhook = config.discord_webhooks?.[retailerKey];
   const previousState = state[stateKey];
   try {
-    const { inStock, title, price } = await checkStock(retailerKey, url);
-    console.log(`  ${inStock ? "✅" : "❌"} [${retailer.name}] ${title || product.name}${price ? ` — ${price}` : ""}`);
+    const html = await fetchPage(url, 2000);
+    const $ = cheerio.load(html);
+    let inStock = false, title = "", price = "";
+    switch (retailerKey) {
+      case "argos":
+        title = $("h1[data-test='product-title'],h1").first().text().trim();
+        price = $("[data-test='product-price']").first().text().trim();
+        inStock = $("button[data-test='add-to-trolley-button'],button[data-test='reserve-button']").length > 0 && $("[data-test='out-of-stock']").length === 0;
+        break;
+      case "smyths":
+        title = $("h1.pdp-title,h1").first().text().trim();
+        price = $("[class*='price']").first().text().trim();
+        inStock = $("button[class*='add'],button[class*='cart']").length > 0 && $("[class*='out-of-stock']").length === 0;
+        break;
+      case "very":
+        title = $("h1").first().text().trim();
+        price = $("[class*='price'],[itemprop='price']").first().text().trim();
+        inStock = $("button[class*='basket']").length > 0 && $("[class*='outOfStock']").length === 0;
+        break;
+      case "game":
+        title = $("h1").first().text().trim();
+        price = $("[class*='price']").first().text().trim();
+        inStock = $("button[class*='basket']").length > 0 && $("[class*='out-of-stock']").length === 0;
+        break;
+      case "pokemoncenter":
+        title = $("h1").first().text().trim();
+        price = $("[class*='price']").first().text().trim();
+        inStock = $("button[class*='cart']").length > 0 && $("[class*='outOfStock'],[class*='sold-out']").length === 0;
+        break;
+    }
+    const icon = inStock ? "✅" : "❌";
+    console.log(`  ${icon} [${retailer.name}] ${title || product.name}${price ? ` — ${price}` : ""}`);
     if (previousState === undefined) {
-      await alertNewProductListing(webhook, retailer, title || product.name, url, inStock, price);
+      await alertNewListing(webhook, retailer, title || product.name, url, inStock, price);
     } else if (inStock && previousState === false) {
       console.log(`  🚨 RESTOCK!`);
       await alertInStock(webhook, retailer, title || product.name, url, price);
@@ -357,25 +334,32 @@ async function checkProduct(product, retailerKey, config, state) {
   }
 }
 
-// ─── MAIN LOOP ─────────────────────────────────────────────────────────────
-
 async function runChecks(config, state) {
   console.log(`\n🔍 Check cycle — ${new Date().toLocaleTimeString("en-GB")}\n`);
-  console.log("📋 Scanning category pages...");
+
+  console.log("━━━ CATEGORY PAGES ━━━");
   for (const key of Object.keys(RETAILERS)) {
-    await checkCategory(key, config, state);
+    await monitorPage(key, CATEGORY_URLS[key], "category", config, state);
     await new Promise(r => setTimeout(r, 3000));
   }
+
+  console.log("\n━━━ SEARCH PAGES ━━━");
+  for (const key of Object.keys(RETAILERS)) {
+    await monitorPage(key, SEARCH_URLS[key], "search", config, state);
+    await new Promise(r => setTimeout(r, 3000));
+  }
+
   if (config.products?.length > 0) {
-    console.log(`\n📦 Checking ${config.products.length} individual products...`);
+    console.log(`\n━━━ INDIVIDUAL PRODUCTS (${config.products.length}) ━━━`);
     for (const product of config.products) {
       console.log(`📦 ${product.name}`);
       for (const key of product.retailers) {
-        await checkProduct(product, key, config, state);
+        await checkIndividualProduct(product, key, config, state);
         await new Promise(r => setTimeout(r, 3000));
       }
     }
   }
+
   saveState(state);
   console.log(`\n✔️  Done. Next check in ${config.check_interval_seconds || 90}s`);
 }
@@ -388,7 +372,7 @@ function startKeepAlive() {
 
 async function main() {
   console.log("╔══════════════════════════════════════╗");
-  console.log("║       PokéMonitor UK  v1.4           ║");
+  console.log("║       PokéMonitor UK  v1.5           ║");
   console.log("║  Headless Chrome Edition 🇬🇧          ║");
   console.log("╚══════════════════════════════════════╝\n");
   const config = loadConfig();
